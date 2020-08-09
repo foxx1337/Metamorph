@@ -11,6 +11,14 @@ program.
 `AttachConsole()` returns immediately so the trick to block the console is
 to wrap the executable in a launcher script - `mm.cmd` here.
 
+## Build and Run
+
+Open the `.sln` in Visual Studio and build it. To run either:
+
+- double click the resulting `Metamorph.exe` to run it as a GUI application
+- from a console, run the `mm.cmd` script in from the `Metamorph.exe` output
+    directory
+
 ## TODO
 
 Deal with redirects - `<`, `>` and `2>` currently don't work.
