@@ -52,7 +52,7 @@ public:
     /// correct <c>CONOUT$</c> or, respectively, <c>CONIN$</c> Windows file.
     /// </summary>
     /// <returns><c>true</c> if the stream is bound and accessible for IO.</returns>
-    bool EnsureRedirectedToValidFile() const
+    bool EnsureRedirectedToValidStream() const
     {
         HANDLE hExisting = GetStdHandle(nStdHandle);
         if (hExisting != INVALID_HANDLE_VALUE)
@@ -93,8 +93,8 @@ const InputOutputStream InputOutputStream::StandardError = InputOutputStream(STD
 bool CanAttachToConsole()
 {
     return AttachConsole(ATTACH_PARENT_PROCESS)
-        && InputOutputStream::StandardOutput.EnsureRedirectedToValidFile()
-        && InputOutputStream::StandardError.EnsureRedirectedToValidFile();
+        && InputOutputStream::StandardOutput.EnsureRedirectedToValidStream()
+        && InputOutputStream::StandardError.EnsureRedirectedToValidStream();
 }
 
 // Forward declarations of functions included in this code module:
