@@ -1,8 +1,9 @@
 // Metamorph.cpp : Defines the entry point for the application.
 //
 
-#include "framework.h"
 #include "Metamorph.h"
+
+#include "framework.h"
 
 #define MAX_LOADSTRING 100
 
@@ -17,11 +18,22 @@ protected:
     OutputStream(DWORD handle, FILE *stream) :
         nStdHandle(handle), cppStdStream(stream)
     {}
-    
+   
 public:
     const DWORD nStdHandle;
     FILE *cppStdStream;
 
+    /// <summary>
+    /// Determines whether the stdlib stream already goes somewhere (a file) or
+    /// it needs to be forcibly redirected (to a console buffer for example).
+    /// </summary>
+    /// <returns><c>true</c> if mapped to file, <c>false<c> if it's lost.</returns>
+    bool IsMappedToFile() const
+    {
+        const int fd = _fileno(cppStdStream);
+        const HANDLE hFile = reinterpret_cast<HANDLE>(_get_osfhandle(fd));
+        return hFile != INVALID_HANDLE_VALUE;
+    }
     
     static const OutputStream StandardOutput;
     static const OutputStream StandardError;
@@ -40,13 +52,20 @@ bool CanRedirectConoutUnbuffered(const OutputStream &stream)
     HANDLE hExisting = GetStdHandle(stream.nStdHandle);
     if (hExisting != INVALID_HANDLE_VALUE)
     {
-        FILE *unused;
-        freopen_s(&unused, "CONOUT$", "w", stream.cppStdStream);
-        setvbuf(stream.cppStdStream, nullptr, _IONBF, 0);
+        if (!stream.IsMappedToFile())
+        {
+            // Running not redirected, with a lost output stream, redirect to CONOUT$.
+            FILE *unused;
+            freopen_s(&unused, "CONOUT$", "w", stream.cppStdStream);
+            setvbuf(stream.cppStdStream, nullptr, _IONBF, 0);
+        }
+        
         return true;
     }
-
-    return false;
+    else
+    {
+        return false;
+    }
 }
 
 /// <summary>
@@ -259,5 +278,6 @@ int RunAsConsole(int argc, wchar_t **wargv)
         printf(" - %d wide chars.\n", ret);
     }
     fprintf(stderr, "This should go to standard error.\n");
+
     return 0;
 }
