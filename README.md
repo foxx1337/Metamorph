@@ -17,8 +17,10 @@ Open the `.sln` in Visual Studio and build it. To run either:
 
 - double click the resulting `Metamorph.exe` to run it as a GUI application
 - from a console, run the `mm.cmd` script in from the `Metamorph.exe` output
-    directory
+    directory. Redirects work across the different terminals as expected:
 
-## TODO
+    ```text
+    .\mm.cmd foobar > .\foo.txt 2>&1
+    ```
+    
 
-Deal with redirects - `<`, `>` and `2>` currently don't work.

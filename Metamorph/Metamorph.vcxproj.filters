@@ -48,6 +48,5 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="mm.cmd" />
-    <None Include="README.md" />
   </ItemGroup>
 </Project>

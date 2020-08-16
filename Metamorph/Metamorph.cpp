@@ -12,16 +12,21 @@ HINSTANCE hInst;                                // current instance
 WCHAR szTitle[MAX_LOADSTRING];                  // The title bar text
 WCHAR szWindowClass[MAX_LOADSTRING];            // the main window class name
 
-class OutputStream final
+class InputOutputStream final
 {
-protected:
-    OutputStream(DWORD handle, FILE *stream) :
-        nStdHandle(handle), cppStdStream(stream)
+private:
+    struct WinConFile
+    {
+        const char *FileName;
+        const char *Mode;
+
+        static const WinConFile ConOut;
+        static const WinConFile ConIn;
+    };
+
+    InputOutputStream(DWORD handle, FILE *stream, WinConFile winConFile) :
+        _winConFile(winConFile), nStdHandle(handle), cppStdStream(stream)
     {}
-   
-public:
-    const DWORD nStdHandle;
-    FILE *cppStdStream;
 
     /// <summary>
     /// Determines whether the stdlib stream already goes somewhere (a file) or
@@ -34,39 +39,50 @@ public:
         const HANDLE hFile = reinterpret_cast<HANDLE>(_get_osfhandle(fd));
         return hFile != INVALID_HANDLE_VALUE;
     }
-    
-    static const OutputStream StandardOutput;
-    static const OutputStream StandardError;
+
+    WinConFile _winConFile;
+
+public:
+    const DWORD nStdHandle;
+    FILE *cppStdStream;
+
+    /// <summary>
+    /// Succeeds if the stream is pointing to a proper place, such as a file
+    /// redirection. If not, attempts to redirect the stdlib stream to/from the
+    /// correct <c>CONOUT$</c> or, respectively, <c>CONIN$</c> Windows file.
+    /// </summary>
+    /// <returns><c>true</c> if the stream is bound and accessible for IO.</returns>
+    bool EnsureRedirectedToValidFile() const
+    {
+        HANDLE hExisting = GetStdHandle(nStdHandle);
+        if (hExisting != INVALID_HANDLE_VALUE)
+        {
+            if (!IsMappedToFile())
+            {
+                // Running not redirected, with a lost output stream, redirect to CONOUT$.
+                FILE *unused;
+                freopen_s(&unused, _winConFile.FileName, _winConFile.Mode, cppStdStream);
+                setvbuf(cppStdStream, nullptr, _IONBF, 0);
+            }
+
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+
+    }
+
+    static const InputOutputStream StandardOutput;
+    static const InputOutputStream StandardError;
 };
 
-const OutputStream OutputStream::StandardOutput = OutputStream(STD_OUTPUT_HANDLE, stdout);
-const OutputStream OutputStream::StandardError = OutputStream(STD_ERROR_HANDLE, stderr);
+const InputOutputStream::WinConFile InputOutputStream::WinConFile::ConIn = { "CONIN$", "r" };
+const InputOutputStream::WinConFile InputOutputStream::WinConFile::ConOut = { "CONOUT$", "w" };
 
-/// <summary>
-/// Attempts to redirect stdout or stderr to the <c>CONOUT$</c> standard Windows file.
-/// </summary>
-/// <param name="stream">Descriptor for the stream to redirect.</param>
-/// <returns><c>true</c> on success.</returns>
-bool CanRedirectConoutUnbuffered(const OutputStream &stream)
-{
-    HANDLE hExisting = GetStdHandle(stream.nStdHandle);
-    if (hExisting != INVALID_HANDLE_VALUE)
-    {
-        if (!stream.IsMappedToFile())
-        {
-            // Running not redirected, with a lost output stream, redirect to CONOUT$.
-            FILE *unused;
-            freopen_s(&unused, "CONOUT$", "w", stream.cppStdStream);
-            setvbuf(stream.cppStdStream, nullptr, _IONBF, 0);
-        }
-        
-        return true;
-    }
-    else
-    {
-        return false;
-    }
-}
+const InputOutputStream InputOutputStream::StandardOutput = InputOutputStream(STD_OUTPUT_HANDLE, stdout, WinConFile::ConOut);
+const InputOutputStream InputOutputStream::StandardError = InputOutputStream(STD_ERROR_HANDLE, stderr, WinConFile::ConOut);
 
 /// <summary>
 /// Determines whether this process runs from a console process. If so, attaches
@@ -77,8 +93,8 @@ bool CanRedirectConoutUnbuffered(const OutputStream &stream)
 bool CanAttachToConsole()
 {
     return AttachConsole(ATTACH_PARENT_PROCESS)
-        && CanRedirectConoutUnbuffered(OutputStream::StandardOutput)
-        && CanRedirectConoutUnbuffered(OutputStream::StandardError);
+        && InputOutputStream::StandardOutput.EnsureRedirectedToValidFile()
+        && InputOutputStream::StandardError.EnsureRedirectedToValidFile();
 }
 
 // Forward declarations of functions included in this code module:
